@@ -9,7 +9,7 @@ states = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID: return
-    kb = [[InlineKeyboardButton("علمني جنرال 🫣", callback_data="teach")],
+    kb = [[InlineKeyboardButton("علمني جنرال ", callback_data="teach")],
           [InlineKeyboardButton("حذف رساله معينه", callback_data="delete_msg")],
           [InlineKeyboardButton("سلملي", callback_data="delete_learn")]]
     await update.message.reply_text("تحكم البوت:", reply_markup=InlineKeyboardMarkup(kb))
