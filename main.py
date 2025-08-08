@@ -5,7 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 # إعدادات البوت
-BOT_TOKEN = "7599894445:AAEuyMWjHE1J53jA2XCH3x2uKnwyso-dsq4"
+BOT_TOKEN = "8211834319:AAERPz5EZnfH5C96UzrDs09H9xIc69BexLU"
 OWNER_ID = 7438003241
 
 # قائمة نطاقات وروابط مشبوهة (تقدر توسعها)
