@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 BOT_TOKEN = "8211834319:AAERPz5EZnfH5C96UzrDs09H9xIc69BexLU"
 OWNER_ID = 7438003241
 
-# قائمة نطاقات وروابط مشبوهة (تقدر توسعها)
+# قائمة نطاقات وروابط مشبوهة (تقدر توسعها)ry
 SUSPICIOUS_DOMAINS = [
     "ngrok", "onion", "darkweb", "hack", "evil", "rat", "payload", "malware", "phishing"
 ]
