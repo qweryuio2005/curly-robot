@@ -1,93 +1,70 @@
-import re
-import os
-import requests
+import requests, difflib
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
-# إعدادات البوت
-BOT_TOKEN = "8211834319:AAERPz5EZnfH5C96UzrDs09H9xIc69BexLU"
+TOKEN = "7599894445:AAEuyMWjHE1J53jA2XCH3x2uKnwyso-dsq4"
+FIREBASE = "https://gnrel-a39f1-default-rtdb.firebaseio.com"
 OWNER_ID = 7438003241
+states = {}
 
-# قائمة نطاقات وروابط مشبوهة (تقدر توسعها)ry
-SUSPICIOUS_DOMAINS = [
-    "ngrok", "onion", "darkweb", "hack", "evil", "rat", "payload", "malware", "phishing"
-]
-
-# امتدادات الملفات المشبوهة
-SUSPICIOUS_EXTENSIONS = [
-    ".exe", ".apk", ".js", ".sh", ".py", ".bat", ".vbs", ".jar"
-]
-
-# دالة فحص الروابط
-def is_suspicious_link(text):
-    for domain in SUSPICIOUS_DOMAINS:
-        if domain.lower() in text.lower():
-            return True
-    return False
-
-# دالة فحص الملفات
-def is_suspicious_file(file_name):
-    return any(file_name.lower().endswith(ext) for ext in SUSPICIOUS_EXTENSIONS)
-
-# زرار التحكم
-def get_main_keyboard():
-    keyboard = [
-        [InlineKeyboardButton("📚 تعليم", callback_data="teach")],
-        [InlineKeyboardButton("🗑 حذف رد", callback_data="delete")],
-        [InlineKeyboardButton("💣 تدمير البيانات", callback_data="destroy")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-# بدء البوت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == OWNER_ID:
-        await update.message.reply_text("أهلاً بمالك البوت 🖤", reply_markup=get_main_keyboard())
-    else:
-        await update.message.reply_text("أهلاً بك! 🤍")
+    if update.effective_user.id != OWNER_ID: return
+    kb = [[InlineKeyboardButton("📚 تعليم", callback_data="teach")],
+          [InlineKeyboardButton("🗑️ حذف رسالة", callback_data="delete_msg")],
+          [InlineKeyboardButton("❌ حذف تعليم", callback_data="delete_learn")]]
+    await update.message.reply_text("تحكم البوت:", reply_markup=InlineKeyboardMarkup(kb))
 
-# استقبال أي رسالة
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text or ""
-    file = update.message.document
-
-    # فحص الروابط
-    if text and is_suspicious_link(text):
-        await context.bot.send_message(OWNER_ID, f"🚨 رابط مشبوه من {update.effective_user.mention_html()}:\n{text}", parse_mode="HTML")
-        await context.bot.ban_chat_member(update.effective_chat.id, user_id)
-        return
-
-    # فحص الملفات
-    if file:
-        if is_suspicious_file(file.file_name):
-            await context.bot.send_message(OWNER_ID, f"🚨 ملف مشبوه من {update.effective_user.mention_html()}:\n{file.file_name}", parse_mode="HTML")
-            await context.bot.ban_chat_member(update.effective_chat.id, user_id)
-            return
-
-    # إرسال أي رسالة أو ملف لك فقط
-    if update.effective_user.id != OWNER_ID:
-        await context.bot.send_message(OWNER_ID, f"📩 من {update.effective_user.mention_html()}:\n{text}", parse_mode="HTML")
-
-# أزرار التحكم
-async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    uid = query.from_user.id
     await query.answer()
-
-    if update.effective_user.id != OWNER_ID:
-        return
-
+    if uid != OWNER_ID: return
     if query.data == "teach":
-        await query.message.reply_text("📚 أرسل الأسئلة والأجوبة:\nسؤال: جواب\n.\nسؤال: جواب")
-    elif query.data == "delete":
-        await query.message.reply_text("🗑 أرسل السؤال اللي تريد تحذفه")
-    elif query.data == "destroy":
-        await query.message.reply_text("💣 تم مسح كل بيانات البوت (وهمية هنا)")
+        states[uid] = "teaching"
+        await query.edit_message_text("أرسل الأسئلة والأجوبة بهالشكل:\nسؤال: جواب\n.\nسؤال: جواب")
+    elif query.data == "delete_msg":
+        data = requests.get(f"{FIREBASE}/data.json").json() or {}
+        kb = [[InlineKeyboardButton(q, callback_data=f"del_{q}")] for q in data]
+        await query.edit_message_text("حدد الرسالة لحذفها:", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data.startswith("del_"):
+        q = query.data[4:]
+        requests.delete(f"{FIREBASE}/data/{q}.json")
+        await query.edit_message_text(f"تم حذف: {q}")
+    elif query.data == "delete_learn":
+        states[uid] = "confirm_delete"
+        kb = [[InlineKeyboardButton("نعم", callback_data="confirm_yes")],
+              [InlineKeyboardButton("لا", callback_data="confirm_no")]]
+        await query.edit_message_text("هل تريد حذف كل التعليم؟", reply_markup=InlineKeyboardMarkup(kb))
+    elif query.data == "confirm_yes":
+        requests.delete(f"{FIREBASE}/data.json")
+        await query.edit_message_text("تم حذف كل التعليم.")
+    elif query.data == "confirm_no":
+        await query.edit_message_text("تم الإلغاء.")
 
-# تشغيل البوت
-if __name__ == "__main__":
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.ALL, handle_message))
-    app.add_handler(CallbackQueryHandler(button_click))
-    print("✅ البوت يعمل الآن...")
-    app.run_polling()
+async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg, uid = update.message.text, update.effective_user.id
+    if uid == OWNER_ID and states.get(uid) == "teaching":
+        for block in msg.split("."):
+            if ":" in block:
+                q, a = [i.strip() for i in block.strip().split(":", 1)]
+                path = f"{FIREBASE}/data/{q}.json"
+                old = requests.get(path).json() or []
+                if a not in old: old.append(a)
+                requests.put(path, json=old)
+        states[uid] = None
+        await update.message.reply_text("تم الحفظ ✅")
+        return
+    data = requests.get(f"{FIREBASE}/data.json").json() or {}
+    question = msg.strip()
+    for saved_q in data:
+        if difflib.SequenceMatcher(None, saved_q.lower(), question.lower()).ratio() > 0.6:
+            import random
+            return await update.message.reply_text(random.choice(data[saved_q]))
+    await update.message.reply_text("ما أعرف الجواب بعد 😅")
+
+app = Application.builder().token(TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
+app.add_handler(CallbackQueryHandler(button))
+app.add_handler(MessageHandler(filters.COMMAND, start))
+print("Bot is running...")
+app.run_polling()
